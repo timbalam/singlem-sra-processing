@@ -1,0 +1,70 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: singlem-aws-
+  # labels:
+  #   workflows.argoproj.io/archive-strategy: "false"
+  annotations:
+    workflows.argoproj.io/description: |
+      A SingleM workflow
+spec:
+  entrypoint: singlem
+  templates:
+    - name: singlem
+      inputs:
+        parameters:
+          - name: SRA_accession_num
+            value: '{{workflow.parameters.SRA_accession_num}}'
+      container:
+        image: 656626576102.dkr.ecr.us-east-2.amazonaws.com/sandpiper-woodcrob:2
+        command: [bash,-c]
+        args: ["
+        kingfisher 
+        get  
+        -r {{inputs.parameters.SRA_accession_num}} 
+        --output-format-possibilities sra
+        --guess-aws-location
+        --hide-download-progress
+        -m 'aws-http'
+        &&
+        ls
+        && 
+        python3 /singlem/singlem/main.py pipe
+          --sra-files {{inputs.parameters.SRA_accession_num}}.sra
+          --no-assign-taxonomy
+          --metapackage /mpkg
+          --archive-otu-table >(gzip >{{inputs.parameters.SRA_accession_num}}.unannotated.singlem.json.gz)
+          --threads 1
+          --metapackage /mpkg
+        &&
+        rm -f {{inputs.parameters.SRA_accession_num}}.sra
+        &&
+        df -h
+        &&
+        ls
+        "]
+        resources:
+          requests:
+            memory: "1500Mi"
+            cpu: 1
+      outputs:
+        artifacts:
+          - name: out-art
+            path: '{{workflow.parameters.SRA_accession_num}}.unannotated.singlem.json.gz'
+            archive: # do not tar.gz the file as argo does by default
+              none: {}
+            s3:
+              endpoint: s3.us-east-2.amazonaws.com
+              bucket: sandpiper-woodcrob
+              key: 'test/{{workflow.parameters.SRA_accession_num}}.unannotated.singlem.json.gz'
+              region: us-east-2
+              # The following fields are secret selectors.
+              # They reference the k8s secret named 'my-s3-credentials'.
+              # This secret is expected to have the keys 'accessKey' and 'secretKey',
+              # containing the base64 encoded credentials to the bucket.
+              accessKeySecret:
+                name: my-s3-credentials
+                key: accessKey
+              secretKeySecret:
+                name: my-s3-credentials
+                key: secretKey

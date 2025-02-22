@@ -1,4 +1,3 @@
-# arm64
 FROM ubuntu:24.04
 
 RUN apt-get update 
@@ -6,12 +5,14 @@ RUN apt-get install -y git python3 python3-pip
 
 # Compile diamond from source for speed
 RUN apt-get install -y cmake g++ make wget libpthread-stubs0-dev zlib1g-dev
-RUN cd /tmp && wget http://github.com/bbuchfink/diamond/archive/v2.1.9.tar.gz
-RUN cd /tmp && tar xzf v2.1.9.tar.gz
-RUN cd /tmp/diamond-2.1.9 && mkdir bin
-RUN cd /tmp/diamond-2.1.9/bin && cmake .. && make -j4
-RUN cd /tmp/diamond-2.1.9/bin && cp diamond /usr/local/bin/
-RUN rm -rf /tmp/diamond-2.1.9 /tmp/v2.1.9.tar.gz
+# 2.1.11 is newest. Seems to have issues with some fastq files, but singlem always pipes in fasta so should be fine? Doesn't appear to be fine in practice, so downgrading.
+ENV DIAMOND_VERSION 2.1.10
+RUN cd /tmp && wget http://github.com/bbuchfink/diamond/archive/v$DIAMOND_VERSION.tar.gz
+RUN cd /tmp && tar xzf v$DIAMOND_VERSION.tar.gz
+RUN cd /tmp/diamond-$DIAMOND_VERSION && mkdir bin
+RUN cd /tmp/diamond-$DIAMOND_VERSION/bin && cmake .. && make -j4
+RUN cd /tmp/diamond-$DIAMOND_VERSION/bin && cp diamond /usr/local/bin/
+RUN rm -rf /tmp/diamond-$DIAMOND_VERSION /tmp/v$DIAMOND_VERSION.tar.gz
 
 # OrfM
 RUN cd /tmp && wget https://github.com/wwood/OrfM/releases/download/v0.7.1/orfm-0.7.1.tar.gz
@@ -66,30 +67,34 @@ RUN pip install --no-dependencies --break-system-packages graftm
 # RUN ln -s /conda_env/bin/sracat /usr/local/bin/sracat
 
 ## Try building sra-toolkit from source
-# linux-headers
-# RUN apk add -y build-essential util-linux  g++ ninja cmake git perl zlib-dev bzip2-dev
-RUN apt install -y build-essential util-linux g++ ninja-build cmake git perl zlib1g-dev libbz2-dev
-ARG CMAKE_BUILD_SHARED_LIBS=1
-ARG CMAKE_BUILD_TYPE=Release
-ARG VDB_BRANCH=engineering
-ARG SRA_BRANCH=${VDB_BRANCH}
-WORKDIR /root
-RUN git clone -b ${VDB_BRANCH} --depth 1 https://github.com/ncbi/ncbi-vdb.git && \
-    git clone -b ${SRA_BRANCH} --depth 1 https://github.com/ncbi/sra-tools.git
-WORKDIR ncbi-vdb
-RUN sed -i.orig -e '/^\s*add_subdirectory\s*(\s*test\s*)\s*$/ d' CMakeLists.txt && \
-    sed -i.orig -e '/^\s*add_subdirectory\s*(\s*ktst\s*)\s*$/ d' libs/CMakeLists.txt
-WORKDIR /root
-RUN cmake -G Ninja -D CMAKE_BUILD_TYPE=Release \
-          -S ncbi-vdb -B build/ncbi-vdb && \
-    cmake --build build/ncbi-vdb
-RUN sed -i.orig -e '/^\s*add_subdirectory\s*(\s*kxml\|vdb-sqlite\s*)\s*$/ d' sra-tools/libs/CMakeLists.txt && \
-    sed -i.orig -e '/\bCPACK\|CPack/ d' sra-tools/CMakeLists.txt
-RUN cmake -G Ninja                                  \
-          -D CMAKE_BUILD_TYPE=Release               \
-          -D VDB_LIBDIR=/root/build/ncbi-vdb/lib    \
-          -S sra-tools -B build/sra-tools &&        \
-    cmake --build build/sra-tools --target install
+# RUN apt install -y build-essential util-linux g++ ninja-build cmake git perl zlib1g-dev libbz2-dev
+# ARG CMAKE_BUILD_SHARED_LIBS=1
+# ARG CMAKE_BUILD_TYPE=Release
+# ARG VDB_BRANCH=engineering
+# ARG SRA_BRANCH=${VDB_BRANCH}
+# WORKDIR /root
+# RUN git clone -b ${VDB_BRANCH} --depth 1 https://github.com/ncbi/ncbi-vdb.git && \
+#     git clone -b ${SRA_BRANCH} --depth 1 https://github.com/ncbi/sra-tools.git
+# WORKDIR ncbi-vdb
+# RUN sed -i.orig -e '/^\s*add_subdirectory\s*(\s*test\s*)\s*$/ d' CMakeLists.txt && \
+#     sed -i.orig -e '/^\s*add_subdirectory\s*(\s*ktst\s*)\s*$/ d' libs/CMakeLists.txt
+# WORKDIR /rootgett
+# RUN cmake -G Ninja -D CMAKE_BUILD_TYPE=Release \
+#           -S ncbi-vdb -B build/ncbi-vdb && \
+#     cmake --build build/ncbi-vdb
+# RUN sed -i.orig -e '/^\s*add_subdirectory\s*(\s*kxml\|vdb-sqlite\s*)\s*$/ d' sra-tools/libs/CMakeLists.txt && \
+#     sed -i.orig -e '/\bCPACK\|CPack/ d' sra-tools/CMakeLists.txt
+# RUN cmake -G Ninja                                  \
+#           -D CMAKE_BUILD_TYPE=Release               \
+#           -D VDB_LIBDIR=/root/build/ncbi-vdb/lib    \
+#           -S sra-tools -B build/sra-tools &&        \
+#     cmake --build build/sra-tools --target install
+
+RUN apt install curl
+RUN cd /tmp && wget https://ftp-trace.ncbi.nlm.nih.gov/sra/sdk/3.2.0/setup-apt.sh
+RUN cd /tmp && bash setup-apt.sh
+# RUN ls -l /tmp/sratoolkit.3.2.0-ubuntu64/bin && fail
+# what do these next to do?
 RUN mkdir -p /etc/ncbi
 RUN printf '/LIBS/IMAGE_GUID = "%s"\n' `uuidgen` > /etc/ncbi/settings.kfg && \
     printf '/libs/cloud/report_instance_identity = "true"\n' >> /etc/ncbi/settings.kfg
@@ -99,20 +104,22 @@ WORKDIR /
 # Get sracat. Bit of a hack here but gets it done.
 RUN cd /tmp && git clone --depth 1 https://github.com/lanl/sracat
 RUN cd /tmp/sracat && cp Makefile Makefile.orig
-RUN cd /tmp/sracat && sed 's= SRA= /usr/local=' Makefile.orig |sed 's/-lncbi-vdb-static//' > Makefile && make
-RUN cd /tmp/sracat && cp sracat /usr/local/bin/sracat.real && echo '#!/bin/bash' > /usr/local/bin/sracat && echo 'LD_LIBRARY_PATH=/usr/local/lib64 /usr/local/bin/sracat.real "$@"' >> /usr/local/bin/sracat && chmod +x /usr/local/bin/sracat
-# test
+RUN cd /tmp && wget https://ftp-trace.ncbi.nlm.nih.gov/sra/ngs/3.2.0/ngs-sdk.3.2.0-linux.tar.gz && tar xzf ngs-sdk.3.2.0-linux.tar.gz
+RUN cp -r /tmp/ngs-sdk.3.2.0-linux/lib64/* /usr/lib/
+RUN cd /tmp/sracat && sed 's= SRA= /tmp/ngs-sdk.3.2.0-linux=' Makefile.orig |sed 's/-lncbi-vdb-static//' > Makefile && make
+RUN cd /tmp/sracat && cp sracat /usr/local/bin/
 RUN sracat -h
 RUN rm -rf /tmp/sracat
 
 # singlem dependencies and data
 COPY plastic3_and_S4.3.0.slimmed.smpkg /mpkg
 
-# NOTE: The following 2 hashes should be changed in sync.
-ENV SINGLEM_COMMIT 43c58769
-ENV SINGLEM_VERSION 0.17.0-dev1
+# NOTE: The following 2 hashes should be changed in sync. Note that the version must comply with PEP440 otherwise pip will not install it below (but now we aren't using pip?).
+ENV SINGLEM_COMMIT 8f3a89d7
+ENV SINGLEM_VERSION 0.18.3.post1
 RUN rm -rf singlem && git init singlem && cd singlem && git remote add origin https://github.com/wwood/singlem && git fetch origin && git checkout $SINGLEM_COMMIT
-RUN echo '__version__ = "'$SINGLEM_VERSION.${SINGLEM_COMMIT}'"' >singlem/singlem/version.py
+# __version__ = {"singlem": "0.18.3", "lyrebird": "0.2.0"}
+RUN echo '__version__ = {"singlem": "'$SINGLEM_VERSION.${SINGLEM_COMMIT}'"}' >singlem/singlem/version.py
 RUN ln -s /singlem/bin/singlem /usr/local/bin/singlem
 
 # Remove bundled singlem packages
@@ -128,7 +135,9 @@ RUN apt install -y curl aria2 pigz
 # extern.run(f'kingfisher get -r {run} --output-format-possibilities fastq.gz --hide-download-progress -m ena-ftp')
 RUN cd /tmp && kingfisher get -r SRR8653040 -m ena-ftp -f fastq.gz --hide-download-progress
 
-RUN /singlem/bin/singlem pipe --sra-files /tmp/SRR8653040.sra --no-assign-taxonomy --metapackage /mpkg --archive-otu-table /tmp/a.json --threads 4
+# RUN apt remove python3-tqdm -y
+# RUN cd singlem && pip install -e . --break-system-packages
+RUN python3 /singlem/singlem/main.py pipe --sra-files /tmp/SRR8653040.sra --no-assign-taxonomy --metapackage /mpkg --archive-otu-table /tmp/a.json --threads 4
 RUN rm /tmp/SRR8653040.sra /tmp/a.json
 
 # Clean apt-get files to try to make it smaller
@@ -141,6 +150,10 @@ RUN apt-get clean
 # COPY dust-v0.8.6-x86_64-unknown-linux-gnu/dust /usr/local/bin/dust
 # RUN chmod +x /usr/local/bin/dust
 # RUN dust -n 60 / && fail
+
+RUN chmod +x /singlem/singlem/main.py
+RUN ln -s /singlem/singlem/main.py /usr/bin/singlem
+RUN cd /tmp && python3 /singlem/extras/singlem_an_sra.py --sra-identifier SRR8653040 --metapackage /mpkg
 
 # Attempt to reduce image size
 FROM scratch
