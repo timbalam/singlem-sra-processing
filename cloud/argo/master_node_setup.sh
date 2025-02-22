@@ -96,3 +96,11 @@ EOF
 
 #### jq - already there? eh, just in case
 sudo apt install jq -y
+
+
+#### pip and extern for slow_submit
+sudo apt update
+sudo apt install python3-pip
+sudo pip3 install extern
+pip install extern --break-system-packages
+
