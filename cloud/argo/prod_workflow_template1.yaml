@@ -11,6 +11,9 @@ spec:
   entrypoint: singlem
   templates:
     - name: singlem
+      retryStrategy:
+        limit: "2"
+        retryPolicy: "Always"
       inputs:
         parameters:
           - name: SRA_accession_num
