@@ -134,7 +134,7 @@ if __name__ == '__main__':
                 try:
                     template = args.workflow_template
                     os.makedirs("submissions", exist_ok=True)
-                    extern.run(f"argo submit -n argo -o json -p SRA_accession_num={acc} {template} |jq > submissions/slow-`date +%Y%m%d-%I%M`.argo_submission.json")
+                    extern.run(f"argo submit -n argo -o json -p SRA_accession_num={acc} {template} |jq > submissions/slow-{acc}-`date +%Y%m%d-%I%M`.argo_submission.json")
                 except extern.ExternCalledProcessError as e:
                     logging.warning("Failed to argo submit. Retrying after pause. Error was {}".format(e))
                     time.sleep(args.sleep_interval)

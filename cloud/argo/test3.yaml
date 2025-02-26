@@ -8,29 +8,20 @@ metadata:
     workflows.argoproj.io/description: |
       A SingleM workflow
 spec:
+  archiveLogs: true
   entrypoint: singlem
-
-  podGC:
-    # Pod GC strategy must be one of the following:
-    # * OnPodCompletion - delete pods immediately when pod is completed (including errors/failures)
-    # * OnPodSuccess - delete pods immediately when pod is successful
-    # * OnWorkflowCompletion - delete pods when workflow is completed
-    # * OnWorkflowSuccess - delete pods when workflow is successful
-    # Default: do not delete pods
-    strategy: OnPodSuccess
-    # The duration before pods in the GC queue get deleted. Defaults to 5s
-    # Requires Argo >= 3.5
-    deleteDelayDuration: 1h
-
+  # arguments:
+  #   parameters:
+  #     - name: SRA_accession_num
+  #       value: SRR8653040 # A 50M test file with a real output
   templates:
     - name: singlem
-      retryStrategy:
-        limit: "2"
-        retryPolicy: "Always"
       inputs:
         parameters:
           - name: SRA_accession_num
             value: '{{workflow.parameters.SRA_accession_num}}'
+      archiveLocation:
+        archiveLogs: true
       container:
         image: 656626576102.dkr.ecr.us-east-2.amazonaws.com/sandpiper-woodcrob:2
         command: [bash,-c]
@@ -61,8 +52,35 @@ spec:
         "]
         resources:
           requests:
-            memory: "1500Mi"
+            memory: "2000Mi"
             cpu: 1
+      # archiveLogs:
+      #   s3:
+      #     endpoint: s3.us-east-2.amazonaws.com
+      #     bucket: sandpiper-woodcrob
+      #     # key: 'test/{{workflow.parameters.SRA_accession_num}}.unannotated.singlem.json.gz'
+      #     region: us-east-2
+      #     # The following fields are secret selectors.
+      #     # They reference the k8s secret named 'my-s3-credentials'.
+      #     # This secret is expected to have the keys 'accessKey' and 'secretKey',
+      #     # containing the base64 encoded credentials to the bucket.
+      #     accessKeySecret:
+      #       name: my-s3-credentials
+      #       key: accessKey
+      #     secretKeySecret:
+      #       name: my-s3-credentials
+      #       key: secretKey
+
+      #     # bucket: your-s3-bucket-name # Must match the bucket above
+      #     key: logs/{{workflow.name}}/{{pod.name}}/my-application.log # Must match the path above
+      #     # endpoint: s3.amazonaws.com #  Or your custom endpoint if needed (e.g., MinIO)
+      #     # region: {{secrets.aws-region}} # Important: Must match the region used in CLI config.
+      #     # accessKeySecret: # Alternative to aws configure; use Kubernetes secrets for credentials
+      #     #   name: aws-secrets
+      #     #   key: aws-access-key-id
+      #     # secretKeySecret:
+      #     #   name: aws-secrets
+      #     #   key: aws-secret-access-key
       outputs:
         artifacts:
           - name: out-art

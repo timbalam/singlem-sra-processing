@@ -78,7 +78,7 @@ cat <<EOF > ~/.saml2aws
 [default]
 app_id               =
 url                  = https://idp.qut.edu.au/idp/profile/SAML2/Unsolicited/SSO?providerId=urn:amazon:webservices
-username             =
+username             = woodcrob
 provider             = KeyCloak
 mfa                  = Auto
 skip_verify          = false
@@ -103,4 +103,8 @@ sudo apt update
 sudo apt install python3-pip
 sudo pip3 install extern
 pip install extern --break-system-packages
+
+
+
+sudo apt install parallel -y
 
