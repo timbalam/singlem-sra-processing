@@ -32,7 +32,7 @@ spec:
           - name: SRA_accession_num
             value: '{{workflow.parameters.SRA_accession_num}}'
       container:
-        image: 656626576102.dkr.ecr.us-east-2.amazonaws.com/sandpiper-woodcrob:2
+        image: 656626576102.dkr.ecr.us-east-1.amazonaws.com/sandpiper-woodcrob-us-east-1:2
         command: [bash,-c]
         args: ["
         kingfisher 
@@ -70,10 +70,10 @@ spec:
             archive: # do not tar.gz the file as argo does by default
               none: {}
             s3:
-              endpoint: s3.us-east-2.amazonaws.com
-              bucket: sandpiper-woodcrob
-              key: 'test/{{workflow.parameters.SRA_accession_num}}.unannotated.singlem.json.gz'
-              region: us-east-2
+              endpoint: s3.us-east-1.amazonaws.com
+              bucket: woodcrob-sandpiper-us-east-1
+              key: 'unannotated/{{workflow.parameters.SRA_accession_num}}.unannotated.singlem.json.gz'
+              region: us-east-1
               # The following fields are secret selectors.
               # They reference the k8s secret named 'my-s3-credentials'.
               # This secret is expected to have the keys 'accessKey' and 'secretKey',
