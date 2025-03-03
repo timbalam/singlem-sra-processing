@@ -43,7 +43,9 @@ spec:
         --hide-download-progress
         -m 'aws-http'
         &&
-        ls
+        free -h
+        &&
+        df -h
         && 
         python3 /singlem/singlem/main.py pipe
           --sra-files {{inputs.parameters.SRA_accession_num}}.sra
@@ -55,9 +57,7 @@ spec:
         &&
         rm -f {{inputs.parameters.SRA_accession_num}}.sra
         &&
-        df -h
-        &&
-        ls
+        find {{inputs.parameters.SRA_accession_num}}.unannotated.singlem.json.gz -type f -empty -delete
         "]
         resources:
           requests:
@@ -72,7 +72,7 @@ spec:
             s3:
               endpoint: s3.us-east-1.amazonaws.com
               bucket: woodcrob-sandpiper-us-east-1
-              key: 'unannotated/{{workflow.parameters.SRA_accession_num}}.unannotated.singlem.json.gz'
+              key: 'unannotated2/{{workflow.parameters.SRA_accession_num}}.unannotated.singlem.json.gz'
               region: us-east-1
               # The following fields are secret selectors.
               # They reference the k8s secret named 'my-s3-credentials'.

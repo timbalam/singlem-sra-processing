@@ -32,13 +32,20 @@ import logging
 import sys
 import os
 import json
-import tempfile
 import time
 import extern
-
+import itertools
+import tempfile
 import queue
 
 sys.path = [os.path.join(os.path.dirname(os.path.realpath(__file__)),'..')] + sys.path
+
+def iterable_chunks(iterable, n):
+    '''Given an iterable, return it in chunks of size n. In the last chunk, the
+    remaining space is replaced by None entries.
+    '''
+    args = [iter(iterable)] * n
+    return itertools.zip_longest(*args, fillvalue=None)
 
 if __name__ == '__main__':
     parent_parser = argparse.ArgumentParser()
@@ -129,19 +136,35 @@ if __name__ == '__main__':
 
         # Submit each with argo submit
         # Keep trying submission, in case of head node failure.
-        for acc in chunk:
-            while True:
-                try:
-                    template = args.workflow_template
-                    os.makedirs("submissions", exist_ok=True)
-                    extern.run(f"argo submit -n argo -o json -p SRA_accession_num={acc} {template} |jq > submissions/slow-{acc}-`date +%Y%m%d-%I%M`.argo_submission.json")
-                except extern.ExternCalledProcessError as e:
-                    logging.warning("Failed to argo submit. Retrying after pause. Error was {}".format(e))
-                    time.sleep(args.sleep_interval)
-                    continue
+        for i, iterchunk in enumerate(iterable_chunks(chunk, 50)):
+            iterchunk = [x for x in iterchunk if x is not None]
+            
+            with tempfile.NamedTemporaryFile(mode='w') as f:
+                with open(args.workflow_template) as template_file:
+                    template = template_file.read()
 
-                logging.info("Submitted")
-                break
+                first = True
+                for acc in iterchunk:
+                    if first:
+                        first = False
+                    else:
+                        f.write("\n---\n")
+                    lower_acc = acc.lower()
+                    f.write(template.replace("{{workflow.parameters.SRA_accession_num}}", acc).replace('generateName: singlem-aws-', f'generateName: slow-{lower_acc}-'))
+                f.flush()
+
+                while True:
+                    try:
+                        template = args.workflow_template
+                        os.makedirs("submissions", exist_ok=True)
+                        extern.run(f"argo submit -n argo -o json {f.name} |jq > submissions/slow-{i}-`date +%Y%m%d-%I%M`.argo_submission.json")
+                    except extern.ExternCalledProcessError as e:
+                        logging.warning("Failed to argo submit. Retrying after pause. Error was {}".format(e))
+                        time.sleep(args.sleep_interval)
+                        continue
+
+                    logging.info("Submitted")
+                    break
 
         num_submitted += len(chunk)
         logging.info(f"Submitted {num_submitted} out of {total_to_submit} i.e. {round(float(num_submitted)/total_to_submit*100)}%")

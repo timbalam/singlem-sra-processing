@@ -1,8 +1,6 @@
 {
     "InstanceTypes": [
-        "c7a.12xlarge",
-        "c7a.16xlarge",
-        "c7a.24xlarge"
+        "c7a.12xlarge"
     ], 
     "TargetCapacity": 50
 }
