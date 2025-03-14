@@ -69,8 +69,8 @@ spec:
         ]
         resources:
           requests:
-            memory: "1500Mi" # Needs upping?
-            cpu: 8
+            memory: "1500Mi" # Needs upping? Meh, it is CPU bound
+            cpu: 4.7 # 8 cpus to diamond appears to translate into 55% usage. Aiming for 95%, set it to 8*0.55/0.95 = 4.7
       outputs:
         artifacts:
           - name: out-art
@@ -80,7 +80,7 @@ spec:
             s3:
               endpoint: s3.us-east-1.amazonaws.com
               bucket: woodcrob-sandpiper-us-east-1
-              key: 'unannotated4/{{workflow.parameters.SRA_accession_num}}.unannotated.singlem.json.gz'
+              key: 'unannotated5/{{workflow.parameters.SRA_accession_num}}.unannotated.singlem.json.gz'
               region: us-east-1
               # The following fields are secret selectors.
               # They reference the k8s secret named 'my-s3-credentials'.
@@ -99,7 +99,7 @@ spec:
             s3:
               endpoint: s3.us-east-1.amazonaws.com
               bucket: woodcrob-sandpiper-us-east-1
-              key: 'logs4/{{workflow.parameters.SRA_accession_num}}.log'
+              key: 'logs5/{{workflow.parameters.SRA_accession_num}}.log'
               region: us-east-1
               accessKeySecret:
                 name: my-s3-credentials
