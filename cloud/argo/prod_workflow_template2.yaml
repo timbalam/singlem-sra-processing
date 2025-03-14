@@ -80,7 +80,7 @@ spec:
             s3:
               endpoint: s3.us-east-1.amazonaws.com
               bucket: woodcrob-sandpiper-us-east-1
-              key: 'unannotated3/{{workflow.parameters.SRA_accession_num}}.unannotated.singlem.json.gz'
+              key: 'unannotated4/{{workflow.parameters.SRA_accession_num}}.unannotated.singlem.json.gz'
               region: us-east-1
               # The following fields are secret selectors.
               # They reference the k8s secret named 'my-s3-credentials'.
@@ -99,7 +99,7 @@ spec:
             s3:
               endpoint: s3.us-east-1.amazonaws.com
               bucket: woodcrob-sandpiper-us-east-1
-              key: 'logs3/{{workflow.parameters.SRA_accession_num}}.log'
+              key: 'logs4/{{workflow.parameters.SRA_accession_num}}.log'
               region: us-east-1
               accessKeySecret:
                 name: my-s3-credentials
