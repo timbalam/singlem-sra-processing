@@ -42,6 +42,7 @@ spec:
         --guess-aws-location
         --hide-download-progress
         -m 'aws-http'
+        2>&1 | tee -a {{inputs.parameters.SRA_accession_num}}.log
         &&
         free -h
         &&
@@ -54,13 +55,16 @@ spec:
           --archive-otu-table >(gzip >{{inputs.parameters.SRA_accession_num}}.unannotated.singlem.json.gz)
           --threads 8
           --metapackage /mpkg
+        2>&1 | tee -a {{inputs.parameters.SRA_accession_num}}.log
         &&
         rm -f {{inputs.parameters.SRA_accession_num}}.sra
         &&
         find {{inputs.parameters.SRA_accession_num}}.unannotated.singlem.json.gz -type f -empty -delete
+        &&
+        ls -lh
         ",
-        "2>&1"
-        "|"
+        "2>&1",
+        "|",
         "tee {{inputs.parameters.SRA_accession_num}}.log"
         ]
         resources:
@@ -90,10 +94,12 @@ spec:
                 key: secretKey
           - name: log-art
             path: '{{workflow.parameters.SRA_accession_num}}.log'
+            archive: # do not tar.gz the file as argo does by default
+              none: {}
             s3:
               endpoint: s3.us-east-1.amazonaws.com
               bucket: woodcrob-sandpiper-us-east-1
-              key: 'logs3/{{workflow.parameters.SRA_accession_num}}.log.gz'
+              key: 'logs3/{{workflow.parameters.SRA_accession_num}}.log'
               region: us-east-1
               accessKeySecret:
                 name: my-s3-credentials
