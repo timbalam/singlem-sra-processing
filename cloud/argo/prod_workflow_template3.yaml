@@ -52,10 +52,12 @@ spec:
           --sra-files {{inputs.parameters.SRA_accession_num}}.sra
           --no-assign-taxonomy
           --metapackage /mpkg
-          --archive-otu-table >(gzip >{{inputs.parameters.SRA_accession_num}}.unannotated.singlem.json.gz)
+          --archive-otu-table >(gzip >{{inputs.parameters.SRA_accession_num}}.unannotated.singlem.json.gz.tmp)
           --threads 24
           --metapackage /mpkg
         2>&1 | tee -a {{inputs.parameters.SRA_accession_num}}.log
+        &&
+        mv {{inputs.parameters.SRA_accession_num}}.unannotated.singlem.json.gz.tmp {{inputs.parameters.SRA_accession_num}}.unannotated.singlem.json.gz
         &&
         rm -f {{inputs.parameters.SRA_accession_num}}.sra
         &&
@@ -80,7 +82,7 @@ spec:
             s3:
               endpoint: s3.us-east-1.amazonaws.com
               bucket: woodcrob-sandpiper-us-east-1
-              key: 'unannotated6/{{workflow.parameters.SRA_accession_num}}.unannotated.singlem.json.gz'
+              key: 'unannotated7/{{workflow.parameters.SRA_accession_num}}.unannotated.singlem.json.gz'
               region: us-east-1
               # The following fields are secret selectors.
               # They reference the k8s secret named 'my-s3-credentials'.
@@ -99,7 +101,7 @@ spec:
             s3:
               endpoint: s3.us-east-1.amazonaws.com
               bucket: woodcrob-sandpiper-us-east-1
-              key: 'logs6/{{workflow.parameters.SRA_accession_num}}.log'
+              key: 'logs721/{{workflow.parameters.SRA_accession_num}}.log'
               region: us-east-1
               accessKeySecret:
                 name: my-s3-credentials
