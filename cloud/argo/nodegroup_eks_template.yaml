@@ -10,7 +10,7 @@ managedNodeGroups:
     instanceType: c7a.12xlarge
     minSize: 0
     maxSize: 100
-    desiredCapacity: 5
+    desiredCapacity: 0
     volumeSize: 350
     volumeType: gp3
     volumeIOPS: 6000
