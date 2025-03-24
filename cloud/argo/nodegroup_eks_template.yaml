@@ -6,12 +6,12 @@ metadata:
   region: us-east-1
 
 managedNodeGroups:
-  - name: io-mach5
+  - name: io-mach6
     instanceType: c7a.12xlarge
     minSize: 0
     maxSize: 100
-    desiredCapacity: 1
-    volumeSize: 350
+    desiredCapacity: 2
+    volumeSize: 550
     volumeType: gp3
     volumeIOPS: 6000
     volumeThroughput: 300
