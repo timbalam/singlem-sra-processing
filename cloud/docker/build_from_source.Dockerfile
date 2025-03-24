@@ -115,8 +115,8 @@ RUN rm -rf /tmp/sracat
 COPY plastic3_and_S4.3.0.slimmed.smpkg /mpkg
 
 # NOTE: The following 2 hashes should be changed in sync. Note that the version must comply with PEP440 otherwise pip will not install it below (but now we aren't using pip?).
-ENV SINGLEM_COMMIT 8f3a89d7
-ENV SINGLEM_VERSION 0.18.3.post1
+ENV SINGLEM_COMMIT 2a3f1f1b
+ENV SINGLEM_VERSION 0.18.3.post3
 RUN rm -rf singlem && git init singlem && cd singlem && git remote add origin https://github.com/wwood/singlem && git fetch origin && git checkout $SINGLEM_COMMIT
 # __version__ = {"singlem": "0.18.3", "lyrebird": "0.2.0"}
 RUN echo '__version__ = {"singlem": "'$SINGLEM_VERSION.${SINGLEM_COMMIT}'"}' >singlem/singlem/version.py
@@ -137,8 +137,8 @@ RUN cd /tmp && kingfisher get -r SRR8653040 -m ena-ftp -f fastq.gz --hide-downlo
 
 # RUN apt remove python3-tqdm -y
 # RUN cd singlem && pip install -e . --break-system-packages
-RUN python3 /singlem/singlem/main.py pipe --sra-files /tmp/SRR8653040.sra --no-assign-taxonomy --metapackage /mpkg --archive-otu-table /tmp/a.json --threads 4
-RUN rm /tmp/SRR8653040.sra /tmp/a.json
+RUN python3 /singlem/singlem/main.py pipe --sra-files /tmp/SRR8653040.sra --no-assign-taxonomy --metapackage /mpkg --archive-otu-table /tmp/a.json --threads 4 --read-chunk-size 200000 --read-chunk-num 2
+RUN rm /tmp/SRR8653040.* /tmp/a.json
 
 # Clean apt-get files to try to make it smaller
 RUN rm -rf /var/lib/apt/lists/*
@@ -153,7 +153,7 @@ RUN apt-get clean
 
 RUN chmod +x /singlem/singlem/main.py
 RUN ln -s /singlem/singlem/main.py /usr/bin/singlem
-RUN cd /tmp && python3 /singlem/extras/singlem_an_sra.py --sra-identifier SRR8653040 --metapackage /mpkg
+# RUN cd /tmp && python3 /singlem/extras/singlem_an_sra.py --sra-identifier SRR8653040 --metapackage /mpkg
 
 # Attempt to reduce image size
 FROM scratch

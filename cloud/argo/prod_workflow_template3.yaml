@@ -71,8 +71,8 @@ spec:
         ]
         resources:
           requests:
-            memory: "16000Mi" # Needs upping? Meh, it is CPU bound. Upped it from 1500 to 16000 - maybe the cause of some OOMKilled?
-            cpu: 10 # 8 cpus to diamond appears to translate into 55% usage. Aiming for 95%, set it to 20*0.55/0.95 = 11.76
+            memory: "5000Mi" # Needs upping? Meh, it is CPU bound. Upped it from 1500 to 16000 - maybe the cause of some OOMKilled? Don't think so, not sure what is going on there.
+            cpu: 5 # 8 cpus to diamond appears to translate into 55% usage. Aiming for 95%, set it to 20*0.55/0.95 = 11.76
       outputs:
         artifacts:
           - name: out-art
@@ -101,7 +101,7 @@ spec:
             s3:
               endpoint: s3.us-east-1.amazonaws.com
               bucket: woodcrob-sandpiper-us-east-1
-              key: 'logs721/{{workflow.parameters.SRA_accession_num}}.log'
+              key: 'logs7/{{workflow.parameters.SRA_accession_num}}.log'
               region: us-east-1
               accessKeySecret:
                 name: my-s3-credentials
