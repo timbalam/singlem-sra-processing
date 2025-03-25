@@ -1,0 +1,109 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: singlem-
+  # labels:
+  #   workflows.argoproj.io/archive-strategy: "false"
+  annotations:
+    workflows.argoproj.io/description: |
+      A SingleM workflow
+spec:
+  entrypoint: singlem
+
+  podGC:
+    # Pod GC strategy must be one of the following:
+    # * OnPodCompletion - delete pods immediately when pod is completed (including errors/failures)
+    # * OnPodSuccess - delete pods immediately when pod is successful
+    # * OnWorkflowCompletion - delete pods when workflow is completed
+    # * OnWorkflowSuccess - delete pods when workflow is successful
+    # Default: do not delete pods
+    strategy: OnPodSuccess
+    # The duration before pods in the GC queue get deleted. Defaults to 5s
+    # Requires Argo >= 3.5
+    deleteDelayDuration: 1h
+
+  templates:
+    - name: singlem
+      retryStrategy:
+        limit: "2"
+        retryPolicy: "Always"
+      inputs:
+        parameters:
+          - name: SRA_accession_num
+            value: '{{workflow.parameters.SRA_accession_num}}'
+      container:
+        image: 656626576102.dkr.ecr.us-east-1.amazonaws.com/sandpiper-woodcrob-us-east-1:3
+        command: [bash,-c]
+        args: ["
+        kingfisher 
+        get  
+        -r {{inputs.parameters.SRA_accession_num}} 
+        --output-format-possibilities sra
+        --guess-aws-location
+        --hide-download-progress
+        -m 'aws-http'
+        2>&1 | tee -a {{inputs.parameters.SRA_accession_num}}.log
+        &&
+        free -h
+        &&
+        df -h
+        && 
+        python3 /singlem/singlem/main.py pipe
+          --sra-files {{inputs.parameters.SRA_accession_num}}.sra
+          --no-assign-taxonomy
+          --metapackage /mpkg
+          --archive-otu-table >(gzip >{{inputs.parameters.SRA_accession_num}}.unannotated.singlem.json.gz.tmp)
+          --threads 8
+          --metapackage /mpkg
+        2>&1 | tee -a {{inputs.parameters.SRA_accession_num}}.log
+        &&
+        mv {{inputs.parameters.SRA_accession_num}}.unannotated.singlem.json.gz.tmp {{inputs.parameters.SRA_accession_num}}.unannotated.singlem.json.gz
+        &&
+        rm -f {{inputs.parameters.SRA_accession_num}}.sra
+        &&
+        ls -lh
+        ",
+        "2>&1",
+        "|",
+        "tee {{inputs.parameters.SRA_accession_num}}.log"
+        ]
+        resources:
+          requests:
+            memory: "1500Mi"
+            cpu: 3.2
+      outputs:
+        artifacts:
+          - name: out-art
+            path: '{{workflow.parameters.SRA_accession_num}}.unannotated.singlem.json.gz'
+            archive: # do not tar.gz the file as argo does by default
+              none: {}
+            s3:
+              endpoint: s3.us-east-1.amazonaws.com
+              bucket: woodcrob-sandpiper-us-east-1
+              key: 'unannotated11/{{workflow.parameters.SRA_accession_num}}.unannotated.singlem.json.gz'
+              region: us-east-1
+              # The following fields are secret selectors.
+              # They reference the k8s secret named 'my-s3-credentials'.
+              # This secret is expected to have the keys 'accessKey' and 'secretKey',
+              # containing the base64 encoded credentials to the bucket.
+              accessKeySecret:
+                name: my-s3-credentials
+                key: accessKey
+              secretKeySecret:
+                name: my-s3-credentials
+                key: secretKey
+          - name: log-art
+            path: '{{workflow.parameters.SRA_accession_num}}.log'
+            archive: # do not tar.gz the file as argo does by default
+              none: {}
+            s3:
+              endpoint: s3.us-east-1.amazonaws.com
+              bucket: woodcrob-sandpiper-us-east-1
+              key: 'logs11/{{workflow.parameters.SRA_accession_num}}.log'
+              region: us-east-1
+              accessKeySecret:
+                name: my-s3-credentials
+                key: accessKey
+              secretKeySecret:
+                name: my-s3-credentials
+                key: secretKey
