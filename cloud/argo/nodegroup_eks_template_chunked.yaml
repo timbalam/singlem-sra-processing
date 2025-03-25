@@ -6,13 +6,13 @@ metadata:
   region: us-east-1
 
 managedNodeGroups:
-  - name: io-unchunked-1
+  - name: io-mach9
     instanceType: c7a.12xlarge
     minSize: 0
     maxSize: 100
-    desiredCapacity: 2
-    volumeSize: 350
+    desiredCapacity: 0
+    volumeSize: 600
     volumeType: gp3
     volumeIOPS: 6000
-    volumeThroughput: 300
+    volumeThroughput: 1000
     spot: true
