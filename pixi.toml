@@ -1,0 +1,32 @@
+[workspace]
+authors = ["Ben Woodcroft <benjwoodcroft@gmail.com>"]
+channels = ["conda-forge","bioconda"]
+name = "singlem-sra-processing"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[tasks]
+
+[feature.main.dependencies]
+python = ">=3.10"
+snakemake = "*"
+polars = "*"
+extern = "*"
+jupyterlab = "*"
+nbconvert = "*"
+r = "*"
+r-irkernel = "*"
+"r-data.table" = "*"
+r-ggplot2 = "*"
+r-ggbeeswarm = "*"
+ncbi-datasets-cli = "*"
+bird_tool_utils_python = "*"
+tqdm = "*"
+scipy = "*"
+
+[feature.singlem.dependencies]
+singlem = "=0.18.3" # no particular reason for this version, just the latest at the time of writing
+
+[environments]
+main = ["main"]
+singlem = ["singlem"]

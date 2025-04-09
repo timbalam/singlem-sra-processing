@@ -1,1 +1,5 @@
 env_singlem_sra_processing/
+
+# pixi environments
+.pixi
+*.egg-info

@@ -24,6 +24,8 @@ microbial_fractions = os.path.join(base_output_directory, 'microbial_fractions.c
 # mkdir '{}/logs'.format(base_output_directory)
 os.makedirs('{}/logs'.format(base_output_directory), exist_ok=True)
 
+localrules: all
+
 rule all:
     input:
         [f'{base_output_directory}/logs/host_or_not_prediction-level{depth_index}.log' for depth_index in tested_depth_indices],
@@ -38,11 +40,14 @@ rule generate_actual_otu_table:
     output:
         otu_table = otu_table,
         done = os.path.join(base_output_directory, 'otu_table.done'),
-    conda:
-        "singlem-dev"
+    threads: 8
+    resources:
+        mem_mb = 64000,
+        runtime = '24h',
     shell:
+        # This is -j20 with threads 8 atm, but eh for now, while it is running.
         "rm -f {log} && find {renewed_output_base_directory} -name '*json' " \
-        "|parallel -j20 --eta -N 50 singlem summarise --input-archive-otu-table {{}} --exclude-off-target-hits --output-otu-table /dev/stdout --quiet '|' tail -n+2" \
+        "|pixi run -e singlem parallel -j20 --eta -N 50 singlem summarise --input-archive-otu-table {{}} --exclude-off-target-hits --output-otu-table /dev/stdout --quiet '|' tail -n+2" \
         "|cat otu_table_headings - |pigz >{output.otu_table} && " \
         "touch {output.done}"
 
@@ -51,8 +56,10 @@ rule generate_condensed_otu_table:
         condensed_table = condensed_table,
         condensed_table_list = os.path.join(base_output_directory, 'condensed.csv.gz.list'),
         done = os.path.join(base_output_directory, 'condensed.done'),
-    conda:
-        "singlem-dev"
+    threads: 8
+    resources:
+        mem_mb = 8000,
+        runtime = '12h',
     shell:
         "find {renewed_output_base_directory} -name '*condensed.csv' > {output.condensed_table_list} && " \
         "cat <(head -1 `head -1 {output.condensed_table_list}`) <(cat {output.condensed_table_list} |parallel --ungroup --eta -j1 tail -n+2 {{}}) |pigz >{output.condensed_table} && " \
@@ -65,10 +72,12 @@ rule fill_taxonomic_profile:
     output:
         condensed_filled_table=condensed_filled_table,
         condensed_filled_done = touch(os.path.join(base_output_directory, 'condensed.filled.done')),
-    conda:
-        "singlem-dev"
+    threads: 1
+    resources:
+        mem_mb = 8000,
+        runtime = '24h',
     shell:
-        "singlem summarise --input-taxonomic-profile <(zcat {input.condensed_table}) --output-filled-taxonomic-profile >(pigz >{output.condensed_filled_table})"
+        "pixi run -e singlem singlem summarise --input-taxonomic-profile <(zcat {input.condensed_table}) --output-filled-taxonomic-profile >(pigz >{output.condensed_filled_table})"
 
 rule generate_taxonomy_level_profiles_from_condensed_for_predictor:
     input:
@@ -80,6 +89,10 @@ rule generate_taxonomy_level_profiles_from_condensed_for_predictor:
             '{}/generate_profiles_from_condensed/{}{}.csv.gz'.format(base_output_directory, predictor_prefix, i)
             for i in tested_depth_indices],
         done='{}/generate_profiles_from_condensed/done'.format(base_output_directory)
+    threads: 8
+    resources:
+        mem_mb = 8000,
+        runtime = '24h',
     conda:
         'singlem_host_or_ecological_predictor/envs/host_or_not_prediction.yml'
     params:
@@ -98,6 +111,10 @@ rule generate_predictor:
         joblib='{}/host_or_not_prediction/host_or_not-'.format(base_output_directory)+'{depth_index}.joblib',
         column_names='{}/host_or_not_prediction/host_or_not_column_names'.format(base_output_directory) + '{depth_index}.csv',
         log='{}/logs/host_or_not_prediction-level'.format(base_output_directory)+'{depth_index}.log',
+    threads: 8
+    resources:
+        mem_mb = 64000,
+        runtime = '24h',
     conda:
         'singlem_host_or_ecological_predictor/envs/host_or_not_prediction.yml'
     threads:
@@ -114,6 +131,10 @@ rule apply_predictor:
     output:
         preds='{}/host_or_not_prediction/host_or_not_preds.csv'.format(base_output_directory),
         done='{}/host_or_not_prediction/apply_predictor/done'.format(base_output_directory)
+    threads: 1
+    resources:
+        mem_mb = 8000,
+        runtime = '24h',
     conda:
         'singlem_host_or_ecological_predictor/envs/host_or_not_prediction.yml'
     shell:
@@ -126,15 +147,16 @@ rule microbial_fraction:
     output:
         fractions = microbial_fractions,
         done = touch('{}/done/microbial_fractions.done'.format(base_output_directory))
-    conda:
-        'singlem-dev'
     params:
-        singlem_bin = singlem_bin,
         sra_num_bases = sra_num_bases
     log:
         '{}/logs/microbial_fractions.log'.format(base_output_directory)
+    threads: 1
+    resources:
+        mem_mb = 8000,
+        runtime = '24h',
     shell:
-        '{params.singlem_bin} microbial_fraction -p <(zcat {input.condensed_profile}) --input-metagenome-sizes {params.sra_num_bases} >{output.fractions} --accept-missing-samples {metapackage_argument} 2> {log}'
+        'pixi run -e singlem singlem microbial_fraction -p <(zcat {input.condensed_profile}) --input-metagenome-sizes {params.sra_num_bases} >{output.fractions} --accept-missing-samples {metapackage_argument} 2> {log}'
 
 rule per_acc_summary:
     input:
@@ -147,13 +169,15 @@ rule per_acc_summary:
     output:
         summary = '{}/per_acc_summary.csv'.format(base_output_directory),
         done = touch('{}/done/per_acc_summary.done'.format(base_output_directory))
-    conda:
-        "singlem-dev"
     log:
         '{}/logs/per_acc_summary.log'.format(base_output_directory)
+    threads: 1
+    resources:
+        mem_mb = 8000,
+        runtime = '24h',
     shell:
         # "PYTHONPATH={singlem_base_directory} "
-        "./per_acc_summary.py -p <(zcat {input.condensed_profile}) "
+        "pixi run -e singlem ./per_acc_summary.py -p <(zcat {input.condensed_profile}) "
         "--microbial-fractions {input.fractions} "
         "-o {output.summary} "
         "--host-predictions {input.preds} 2> {log}"
