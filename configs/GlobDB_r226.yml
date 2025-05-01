@@ -1,0 +1,11 @@
+# As above except YAML
+GTDB_VERSION: '11-RS226'
+RENEWED_OUTPUT_BASE_DIRECTORY:  '/work/microbiome/ibis/deep_ocean/results/renew/20250411'
+BASE_OUTPUT_DIRECTORY:  '/work/microbiome/ibis/deep_ocean/results/renew_processing/20250501'
+PREDICTOR_PREFIX:  'sra_20250220.10-R226-'
+METAPACKAGE_ARGUMENT:  '--metapackage /work/microbiome/db/singlem/GlobDB_r226.metapackage_v1.smpkg'
+
+ACC_ORGANISM:  '/work/microbiome/msingle/mess/195_sandpiper1/data/acc_organism.csv'
+TAXONOMY_JSON:  '/work/microbiome/msingle/mess/195_sandpiper1/data/sra_taxonomies.json'
+# (env_singlem_sra_processing)aquarius01:20250409:~/m/msingle/mess/195_sandpiper1/data$ cat shotgun_sra_20250220/* |jq -r '["accession", "num_bases"], [.acc, (.attributes[] | select(.k == "bases") | .v)] | @tsv' >acc_num_bases.tsv
+SRA_NUM_BASES:  '/work/microbiome/msingle/mess/195_sandpiper1/data/acc_num_bases.tsv'

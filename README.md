@@ -8,13 +8,12 @@ First modify paths at the top of the Snakemake
     
 Then setup:
 ```
-mamba env create -p env_singlem_sra_processing -f env.yml
-conda activate ./env_singlem_sra_processing
+pixi install --all
 ```
 
 and run
 ```
-snakemake --use-conda --cores 1
+pixi run snakemake --cores 1
 ```
 
 Make sure the correct taxonomic level is chosen for applying predictions in the Snakemake file. See 

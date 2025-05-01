@@ -10,6 +10,8 @@ version = "0.1.0"
 [feature.main.dependencies]
 python = ">=3.10"
 snakemake = "*"
+snakemake-executor-plugin-cluster-generic = "*"
+conda = ">=24.7.1"
 polars = "*"
 extern = "*"
 jupyterlab = "*"
@@ -28,5 +30,6 @@ scipy = "*"
 singlem = "=0.18.3" # no particular reason for this version, just the latest at the time of writing
 
 [environments]
+default = ["main"]
 main = ["main"]
 singlem = ["singlem"]
