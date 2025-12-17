@@ -9,7 +9,10 @@ if [[ uname -s != "Darwin" ]]; then
 fi
 
 # Download the binary
-curl -sLO "https://github.com/argoproj/argo-workflows/releases/download/v3.6.4/argo-$ARGO_OS-amd64.gz"
+ARGO_VERSION=$(curl -fsSL \
+  https://api.github.com/repos/argoproj/argo-workflows/releases/latest \
+  | jq -r .tag_name)
+curl -sLO "https://github.com/argoproj/argo-workflows/releases/download/$ARGO_VERSION/argo-$ARGO_OS-amd64.gz"
 
 # Unzip
 gunzip "argo-$ARGO_OS-amd64.gz"
