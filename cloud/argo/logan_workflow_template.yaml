@@ -63,7 +63,7 @@ spec:
           --context-window 1000
         2>&1 | tee -a logs/$A.log
         &&
-        grep -Fw -f $A.read_names <(zstdcat $A.contigs.fa.zst) >contig_names/$A.txt
+        grep -Fw -f $A.read_names <(zstdcat $A.contigs.fa.zst) |gzip >contig_names/$A.txt.gz
         &&
         echo passed grep
         &&
