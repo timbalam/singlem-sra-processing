@@ -2,15 +2,15 @@ apiVersion: eksctl.io/v1alpha5
 kind: ClusterConfig
 
 metadata:
-  name: sandpiper4
+  name: sandpiper
   region: us-east-1
 
 managedNodeGroups:
   - name: io-mach9
     instanceType: c7a.12xlarge
     minSize: 0
-    maxSize: 100
-    desiredCapacity: 0
+    maxSize: 2
+    desiredCapacity: 2
     volumeSize: 600
     volumeType: gp3
     volumeIOPS: 6000

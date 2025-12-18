@@ -1,0 +1,135 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: singlem-
+  # labels:
+  #   workflows.argoproj.io/archive-strategy: "false"
+  annotations:
+    workflows.argoproj.io/description: |
+      A SingleM workflow
+spec:
+  entrypoint: singlem
+
+  podGC:
+    # Pod GC strategy must be one of the following:
+    # * OnPodCompletion - delete pods immediately when pod is completed (including errors/failures)
+    # * OnPodSuccess - delete pods immediately when pod is successful
+    # * OnWorkflowCompletion - delete pods when workflow is completed
+    # * OnWorkflowSuccess - delete pods when workflow is successful
+    # Default: do not delete pods
+    strategy: OnPodSuccess
+    # The duration before pods in the GC queue get deleted. Defaults to 5s
+    # Requires Argo >= 3.5
+    deleteDelayDuration: 1h
+
+  templates:
+    - name: singlem
+      retryStrategy:
+        limit: "0" # Changed from 2 to 0 for DEBUG
+        retryPolicy: "Always"
+      inputs:
+        parameters:
+          - name: SRA_accession_num
+            value: '{{workflow.parameters.SRA_accession_num}}' # Space separated list of SRA accession numbers
+      container:
+        image: public.ecr.aws/r8c0q0v5/woodcrob/singlem:latest
+        command: [bash,-c]
+        args: ["
+        echo workflow UID: {{workflow.uid}};
+        echo date: `date`;
+        mkdir -p logs archive_otu_tables contig_names;
+        for A in {{inputs.parameters.SRA_accession_num}}; do A=$A bash -e -o pipefail -c '
+        aws
+        s3
+        cp
+        --quiet
+        s3://logan-pub/c/$A/$A.contigs.fa.zst
+        .
+        --no-sign-request;
+        ls -lh $A.contigs.fa.zst
+        &&
+        free -h
+        &&
+        df -h
+        && 
+        python3 /singlem/singlem/main.py pipe
+          --forward $A.contigs.fa.zst
+          --no-assign-taxonomy
+          --metapackage /mpkg
+          --archive-otu-table >(gzip >$A.unannotated.singlem.json.gz.tmp)
+          --otu-table >(tail -n+2 |cut -f7 |sed \"s= =\\n=g; s=^=\\>=; s=:.*==\" >$A.read_names)
+          --output-extras
+          --threads 24
+          --context-window 1000
+        2>&1 | tee -a logs/$A.log
+        &&
+        grep -Fw -f $A.read_names <(zstdcat $A.contigs.fa.zst) >contig_names/$A.txt
+        &&
+        echo passed grep
+        &&
+        mv $A.unannotated.singlem.json.gz.tmp archive_otu_tables/$A.unannotated.singlem.json.gz
+        2>&1 | tee -a logs/$A.log;
+        rm -f $A.contigs.fa.zst $A.read_names;
+        find archive_otu_tables/$A.unannotated.singlem.json.gz -type f -empty -delete;
+        ';
+        done"
+        ]
+        resources:
+          requests:
+            memory: "5000Mi" # Needs upping? Meh, it is CPU bound. Upped it from 1500 to 16000 - maybe the cause of some OOMKilled? Don't think so, not sure what is going on there.
+            cpu: 4.5 # 8 cpus to diamond appears to translate into 55% usage. Aiming for 95%, set it to 20*0.55/0.95 = 11.76
+      outputs:
+        artifacts:
+          - name: out-art
+            path: 'archive_otu_tables'
+            archive: # do not tar.gz the file as argo does by default
+              none: {}
+            s3:
+              endpoint: s3.us-east-1.amazonaws.com
+              bucket: woodcrob-sandpiper-us-east-1
+              key: 'logan1-us-east-1/jobs/{{workflow.uid}}'
+              region: us-east-1
+              # The following fields are secret selectors.
+              # They reference the k8s secret named 'my-s3-credentials'.
+              # This secret is expected to have the keys 'accessKey' and 'secretKey',
+              # containing the base64 encoded credentials to the bucket.
+              accessKeySecret:
+                name: my-s3-credentials
+                key: accessKey
+              secretKeySecret:
+                name: my-s3-credentials
+                key: secretKey
+          - name: contignames-art
+            path: 'contig_names'
+            archive: # do not tar.gz the file as argo does by default
+              none: {}
+            s3:
+              endpoint: s3.us-east-1.amazonaws.com
+              bucket: woodcrob-sandpiper-us-east-1
+              key: 'logan1-us-east-1-contigs/jobs/{{workflow.uid}}'
+              region: us-east-1
+              # The following fields are secret selectors.
+              # They reference the k8s secret named 'my-s3-credentials'.
+              # This secret is expected to have the keys 'accessKey' and 'secretKey',
+              # containing the base64 encoded credentials to the bucket.
+              accessKeySecret:
+                name: my-s3-credentials
+                key: accessKey
+              secretKeySecret:
+                name: my-s3-credentials
+                key: secretKey
+          - name: log-art
+            path: 'logs'
+            archive: # do not tar.gz the file as argo does by default
+              none: {}
+            s3:
+              endpoint: s3.us-east-1.amazonaws.com
+              bucket: woodcrob-sandpiper-us-east-1
+              key: 'logan1-us-east-1-logs/jobs/{{workflow.uid}}'
+              region: us-east-1
+              accessKeySecret:
+                name: my-s3-credentials
+                key: accessKey
+              secretKeySecret:
+                name: my-s3-credentials
+                key: secretKey

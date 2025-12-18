@@ -67,7 +67,7 @@ source ~/.config/envman/PATH.env
 k9s version
 
 
-#### saml2aws
+#### saml2aws - needed? Is out of date at least, config needs updating
 CURRENT_VERSION=2.36.18
 wget https://github.com/Versent/saml2aws/releases/download/v${CURRENT_VERSION}/saml2aws_${CURRENT_VERSION}_linux_amd64.tar.gz
 tar -xzvf saml2aws_${CURRENT_VERSION}_linux_amd64.tar.gz
@@ -103,8 +103,8 @@ sudo apt install jq -y
 
 #### pip and extern for slow_submit
 sudo apt update
-sudo apt install python3-pip
-sudo pip3 install extern
+sudo apt install -y python3-pip
+# sudo pip3 install extern
 pip install extern --break-system-packages
 
 
