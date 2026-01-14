@@ -1,9 +1,10 @@
-# As above except YAML
 GTDB_VERSION: '10-RS220'
-RENEWED_OUTPUT_BASE_DIRECTORY:  '/work/microbiome/msingle/mess/197_R226_renew_mach1/renew'
-BASE_OUTPUT_DIRECTORY:  '/work/microbiome/msingle/mess/197_R226_renew_mach1/processing_20250409'
+RENEWED_OUTPUT_BASE_DIRECTORY:  '/work/microbiome/msingle/mess/198_R226_renew_mach2/renew_combined'
+BASE_OUTPUT_DIRECTORY:  '/work/microbiome/msingle/mess/198_R226_renew_mach2/processing_20250409-mach2'
 PREDICTOR_PREFIX:  'sra_20250220.10-R226-'
-METAPACKAGE_ARGUMENT:  '--metapackage /work/microbiome/msingle/mess/196_metapackage_r226/update_metapackage_ben/metapackage/S5.4.0.GTDB_r226.metapackage_20250331.smpkg'
+METAPACKAGE_ARGUMENT:  '--metapackage /work/microbiome/msingle/mess/196_metapackage_r226/update_metapackage_gtdb_transcripts/metapackage/S5.4.0.GTDB_r226.metapackage_20250331.smpkg'
+
+# TODO: Make the following commands into snakemake so they don't need repeating
 
 # cat /work/microbiome/msingle/mess/195_sandpiper1/data/shotgun_sra_20250220/* |jq -r '[.acc,.bioproject,.organism] |@csv' |cat <(echo acc,bioproject,organism) - >/work/microbiome/msingle/mess/195_sandpiper1/data/acc_organism.csv
 ACC_ORGANISM:  '/work/microbiome/msingle/mess/195_sandpiper1/data/acc_organism.csv'
