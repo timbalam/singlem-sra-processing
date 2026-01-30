@@ -71,6 +71,7 @@ spec:
         2>&1 | tee -a logs/$A.log;
         rm -f $A.contigs.fa.zst $A.read_names;
         find archive_otu_tables/$A.unannotated.singlem.json.gz -type f -empty -delete;
+        echo workflow UID: {{workflow.uid}};
         ';
         done"
         ]
