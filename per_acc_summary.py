@@ -81,7 +81,7 @@ if __name__ == '__main__':
     # ms = pl.read_csv(args.input_metagenome_sizes, separator='\t')
     # logging.info(f'Read {len(ms)} metagenome sizes')
 
-    merged1 = mf.join(hp, left_on='sample', right_on='acc')
+    merged1 = mf.join(hp, left_on='sample', right_on='acc', how='outer')
 
     logging.info("Reading coverages and calculating - takes some time.")
     profile_ids = []
@@ -111,12 +111,18 @@ if __name__ == '__main__':
         'root_coverage': profile_root_coverage,
         'species_coverage': profile_species_coverage
     })
-    coverages = coverages.with_columns(pl.col('species_coverage') / pl.col('root_coverage').alias('known_species_fraction'))
+    coverages = coverages.with_columns((pl.col('species_coverage') / pl.col('root_coverage')).alias('known_species_fraction'))
     
-    merged = coverages.join(merged1, on='sample')
+    merged = coverages.join(merged1, on='sample', how='outer')
 
     logging.info("Writing output ..")
     merged.write_csv(args.output)
+
+    # Log how many rows were written overall, and how many from each of the merged datasets (coverages, microbial fractions, host predictions)
+    logging.info(f'Wrote {len(merged)} rows to output')
+    logging.info(f'Coverages: {len(coverages)} rows')
+    logging.info(f'Microbial fractions: {len(mf)} rows')
+    logging.info(f'Host predictions: {len(hp)} rows')
 
     logging.info("Done.")
 
