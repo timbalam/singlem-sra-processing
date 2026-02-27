@@ -3,16 +3,12 @@ FROM ubuntu:24.04
 RUN apt-get update 
 RUN apt-get install -y git python3 python3-pip
 
-# Compile diamond from source for speed
-RUN apt-get install -y cmake g++ make wget libpthread-stubs0-dev zlib1g-dev
-# 2.1.11 is newest. Seems to have issues with some fastq files, but singlem always pipes in fasta so should be fine? Doesn't appear to be fine in practice, so downgrading.
-ENV DIAMOND_VERSION 2.1.10
-RUN cd /tmp && wget http://github.com/bbuchfink/diamond/archive/v$DIAMOND_VERSION.tar.gz
-RUN cd /tmp && tar xzf v$DIAMOND_VERSION.tar.gz
-RUN cd /tmp/diamond-$DIAMOND_VERSION && mkdir bin
-RUN cd /tmp/diamond-$DIAMOND_VERSION/bin && cmake .. && make -j4
-RUN cd /tmp/diamond-$DIAMOND_VERSION/bin && cp diamond /usr/local/bin/
-RUN rm -rf /tmp/diamond-$DIAMOND_VERSION /tmp/v$DIAMOND_VERSION.tar.gz
+# Don't worry about compiling from source because different code paths are already in diamond.
+RUN apt-get install -y wget
+ENV DIAMOND_VERSION 2.1.23
+RUN cd /tmp && wget http://github.com/bbuchfink/diamond/releases/download/v$DIAMOND_VERSION/diamond-linux64.tar.gz
+RUN cd /tmp && tar xzf diamond-linux64.tar.gz && mv diamond /usr/local/bin/
+RUN rm -rf /tmp/diamond-linux64.tar.gz
 
 # OrfM
 RUN cd /tmp && wget https://github.com/wwood/OrfM/releases/download/v0.7.1/orfm-0.7.1.tar.gz
@@ -112,11 +108,11 @@ RUN sracat -h
 RUN rm -rf /tmp/sracat
 
 # singlem dependencies and data
-COPY plastic3_and_S4.3.0.slimmed.smpkg /mpkg
+COPY S5.4.0.GTDB_r226.metapackage_20250331.slim.smpkg /mpkg
 
 # NOTE: The following 2 hashes should be changed in sync. Note that the version must comply with PEP440 otherwise pip will not install it below (but now we aren't using pip?).
-ENV SINGLEM_COMMIT 2a3f1f1b
-ENV SINGLEM_VERSION 0.18.3.post3
+ENV SINGLEM_COMMIT dfe047a
+ENV SINGLEM_VERSION 0.20.3.post1
 RUN rm -rf singlem && git init singlem && cd singlem && git remote add origin https://github.com/wwood/singlem && git fetch origin && git checkout $SINGLEM_COMMIT
 # __version__ = {"singlem": "0.18.3", "lyrebird": "0.2.0"}
 RUN echo '__version__ = {"singlem": "'$SINGLEM_VERSION.${SINGLEM_COMMIT}'"}' >singlem/singlem/version.py
@@ -135,9 +131,8 @@ RUN apt install -y curl aria2 pigz
 # extern.run(f'kingfisher get -r {run} --output-format-possibilities fastq.gz --hide-download-progress -m ena-ftp')
 RUN cd /tmp && kingfisher get -r SRR8653040 -m ena-ftp -f fastq.gz --hide-download-progress
 
-# RUN apt remove python3-tqdm -y
-# RUN cd singlem && pip install -e . --break-system-packages
-RUN python3 /singlem/singlem/main.py pipe --sra-files /tmp/SRR8653040.sra --no-assign-taxonomy --metapackage /mpkg --archive-otu-table /tmp/a.json --threads 4 --read-chunk-size 200000 --read-chunk-num 2
+## Comment out because they don't work in dockerfile, but do work in reality?
+RUN timeout 60 python3 /singlem/singlem/main.py pipe --sra-files /tmp/SRR8653040.sra --no-assign-taxonomy --metapackage /mpkg --archive-otu-table /tmp/a.json --threads 4 --read-chunk-size 200000 --read-chunk-num 2
 RUN rm /tmp/SRR8653040.* /tmp/a.json
 
 # Clean apt-get files to try to make it smaller
