@@ -36,7 +36,7 @@ spec:
           - name: chunk_size
             value: '{{workflow.parameters.chunk_size}}'
       container:
-        image: 656626576102.dkr.ecr.us-east-1.amazonaws.com/sandpiper-woodcrob-us-east-1:3
+        image: public.ecr.aws/r8c0q0v5/woodcrob/singlem:latest
         command: [bash,-c]
         args: ["
         kingfisher 
@@ -71,7 +71,8 @@ spec:
         ",
         "2>&1",
         "|",
-        "tee {{inputs.parameters.SRA_accession_num}}.chunk{{inputs.parameters.chunk}}.log"
+        "tee {{inputs.parameters.SRA_accession_num}}.chunk{{inputs.parameters.chunk}}.log",
+        "; echo workflow UID: {{workflow.uid}}",
         ]
         resources:
           requests:
@@ -86,7 +87,7 @@ spec:
             s3:
               endpoint: s3.us-east-1.amazonaws.com
               bucket: woodcrob-sandpiper-us-east-1
-              key: 'unannotated8/{{workflow.parameters.SRA_accession_num}}.chunk{{workflow.parameters.chunk}}.unannotated.singlem.json.gz'
+              key: 'unannotated/{{workflow.uid}}/{{workflow.parameters.SRA_accession_num}}.chunk{{workflow.parameters.chunk}}.unannotated.singlem.json.gz'
               region: us-east-1
               # The following fields are secret selectors.
               # They reference the k8s secret named 'my-s3-credentials'.
@@ -105,7 +106,7 @@ spec:
             s3:
               endpoint: s3.us-east-1.amazonaws.com
               bucket: woodcrob-sandpiper-us-east-1
-              key: 'logs8/{{workflow.parameters.SRA_accession_num}}.chunk{{workflow.parameters.chunk}}.log'
+              key: 'logs/{{workflow.uid}}/{{workflow.parameters.SRA_accession_num}}.chunk{{workflow.parameters.chunk}}.log'
               region: us-east-1
               accessKeySecret:
                 name: my-s3-credentials

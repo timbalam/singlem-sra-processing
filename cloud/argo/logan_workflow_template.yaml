@@ -25,7 +25,7 @@ spec:
   templates:
     - name: singlem
       retryStrategy:
-        limit: "0" # Changed from 2 to 0 for DEBUG
+        limit: "2" # Changed from 2 to 0 for DEBUG
         retryPolicy: "Always"
       inputs:
         parameters:
@@ -78,7 +78,7 @@ spec:
         resources:
           requests:
             memory: "5000Mi" # Needs upping? Meh, it is CPU bound. Upped it from 1500 to 16000 - maybe the cause of some OOMKilled? Don't think so, not sure what is going on there.
-            cpu: 4.5 # 8 cpus to diamond appears to translate into 55% usage. Aiming for 95%, set it to 20*0.55/0.95 = 11.76
+            cpu: 4 # 8 cpus to diamond appears to translate into 55% usage. Aiming for 95%, set it to 20*0.55/0.95 = 11.76
       outputs:
         artifacts:
           - name: out-art
