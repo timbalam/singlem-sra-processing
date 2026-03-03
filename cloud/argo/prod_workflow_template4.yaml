@@ -72,7 +72,7 @@ spec:
         "2>&1",
         "|",
         "tee {{inputs.parameters.SRA_accession_num}}.chunk{{inputs.parameters.chunk}}.log",
-        "; echo workflow UID: {{workflow.uid}}",
+        "&& echo workflow UID: {{workflow.uid}}",
         ]
         resources:
           requests:
