@@ -31,6 +31,8 @@ spec:
         parameters:
           - name: SRA_accession_num
             value: '{{workflow.parameters.SRA_accession_num}}'
+          - name: batch_name
+            value: '{{workflow.parameters.batch_name}}'
           - name: chunk
             value: '{{workflow.parameters.chunk}}'
           - name: chunk_size
@@ -87,7 +89,7 @@ spec:
             s3:
               endpoint: s3.us-east-1.amazonaws.com
               bucket: woodcrob-sandpiper-us-east-1
-              key: 'unannotated/{{workflow.uid}}/{{workflow.parameters.SRA_accession_num}}.chunk{{workflow.parameters.chunk}}.unannotated.singlem.json.gz'
+              key: '{{workflow.parameters.batch_name}}/unannotated/{{workflow.uid}}/{{workflow.parameters.SRA_accession_num}}.chunk{{workflow.parameters.chunk}}.unannotated.singlem.json.gz'
               region: us-east-1
               # The following fields are secret selectors.
               # They reference the k8s secret named 'my-s3-credentials'.
@@ -106,7 +108,7 @@ spec:
             s3:
               endpoint: s3.us-east-1.amazonaws.com
               bucket: woodcrob-sandpiper-us-east-1
-              key: 'logs/{{workflow.uid}}/{{workflow.parameters.SRA_accession_num}}.chunk{{workflow.parameters.chunk}}.log'
+              key: '{{workflow.parameters.batch_name}}/logs/{{workflow.uid}}/{{workflow.parameters.SRA_accession_num}}.chunk{{workflow.parameters.chunk}}.log'
               region: us-east-1
               accessKeySecret:
                 name: my-s3-credentials

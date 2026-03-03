@@ -51,7 +51,7 @@ def iterable_chunks(iterable, n):
 if __name__ == '__main__':
     parent_parser = argparse.ArgumentParser()
 
-    parent_parser.add_argument('--input-runlist-csv', required=True, help='CSV with headers, at least acc, chunk_size and chunk')
+    parent_parser.add_argument('--input-runlist-csv', required=True, help='CSV with headers, at least acc, batch_name, chunk_size and chunk')
     parent_parser.add_argument('--workflow-template', required=True, help='workflow template to use')
     parent_parser.add_argument('--sleep-interval', type=int, help='sleep this many seconds between submissions', default=60 * 5)
     parent_parser.add_argument('--min-running-pending-file', help='only submit when the number of jobs is below this (a number in a file)')
@@ -154,7 +154,8 @@ if __name__ == '__main__':
                         "{{workflow.parameters.SRA_accession_num}}", row['acc']).replace(
                         'generateName: singlem-aws-', f'generateName: slow-{lower_acc}-').replace(
                         "{{workflow.parameters.chunk_size}}", str(row['chunk_size'])).replace(
-                        "{{workflow.parameters.chunk}}", str(row['chunk'])))
+                        "{{workflow.parameters.chunk}}", str(row['chunk'])).replace(
+                        "{{workflow.parameters.batch_name}}", row['batch_name']))
                 f.flush()
 
                 while True:
