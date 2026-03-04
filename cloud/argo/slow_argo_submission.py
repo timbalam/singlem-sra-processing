@@ -31,7 +31,6 @@ import argparse
 import logging
 import sys
 import os
-import json
 import time
 import extern
 import itertools
@@ -110,14 +109,13 @@ if __name__ == '__main__':
                 min_running_pending = int(f.read().strip())
                 while True:
                     try:
-                        argo_json = extern.run("argo list -n argo --status Running,Pending --output json")
-                        # logging.debug(f"argo_json: {argo_json}")
-                        argo_json = json.loads(argo_json)
-                        running_pending = len(argo_json)
+                        pods_output = extern.run("kubectl get pods -n argo --no-headers")
+                        running_pending = sum(1 for line in pods_output.splitlines()
+                                              if len(line.split()) >= 3 and line.split()[2] in ('Running', 'Pending'))
                         logging.debug(f"Running/Pending: {running_pending}")
                         break
                     except extern.ExternCalledProcessError as e:
-                        logging.warning(f"Failed to get argo list. Retrying after pause. Error was {e}")
+                        logging.warning(f"Failed to get kubectl pod list. Retrying after pause. Error was {e}")
                         time.sleep(args.sleep_interval)
                         continue
                 if running_pending >= min_running_pending:
