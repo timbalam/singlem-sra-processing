@@ -127,8 +127,9 @@ if __name__ == '__main__':
                         # Get workflows not pods because otherwise we don't get the full list
                         pods_output = extern.run("kubectl get workflows -n argo --no-headers")
                         running_pending = sum(1 for line in pods_output.splitlines()
-                                              if len(line.split()) >= 3 and line.split()[2] in ('Running', 'Pending'))
-                        logging.debug(f"Running/Pending: {running_pending}")
+                                              if len(line.split()) >= 3 and line.split()[1] in ('Running', 'Pending'))
+                        logging.info(f"Running/Pending: {running_pending}")
+                        sys.exit(0)
                         break
                     except extern.ExternCalledProcessError as e:
                         logging.warning(f"Failed to get kubectl pod list. Retrying after pause. Error was {e}")
