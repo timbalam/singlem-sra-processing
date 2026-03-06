@@ -58,7 +58,11 @@ if __name__ == '__main__':
     parent_parser.add_argument('--batch-size-file', help='read from a file which is just a number - submit this many each time')
     parent_parser.add_argument('--blacklist', help='Ignore accessions that are in this file')
     parent_parser.add_argument('--whitelist', help='Only submit accessions that are in this file')
+    parent_parser.add_argument('--chunk-blacklist', help='Ignore chunks that are in this file. Each line is SRA_accession_num,chunk,chunk_size. '
+        'Can be constructed from submission JSON files with: '
+        'jq -r \'.spec.templates[0].inputs.parameters | from_entries | [.SRA_accession_num, .chunk, .chunk_size] | join(",")\'  submissions/slow-*.argo_submission.json')
     
+    parent_parser.add_argument('--dry-run', help='apply white and blacklists, print the number of accessions to submit, and quit', action="store_true")
     parent_parser.add_argument('--debug', help='output debug information', action="store_true")
     #parent_parser.add_argument('--version', help='output version information and quit',  action='version', version=repeatm.__version__)
     parent_parser.add_argument('--quiet', help='only output errors', action="store_true")
@@ -78,23 +82,34 @@ if __name__ == '__main__':
     logging.info(f"Found {runs.shape[0]} accessions from input runlist")
 
     whitelist = []
-    blacklist = []
+    blacklist = set()
     if args.whitelist:
         with open(args.whitelist) as f:
             whitelist = list([s.strip() for s in f.readlines()])
     if args.blacklist:
         with open(args.blacklist) as f:
-            blacklist = list([s.strip() for s in f.readlines()])
-    logging.info(f"Read {len(whitelist)} whitelist and {len(blacklist)} blacklist accessions")
+            blacklist = set([s.strip() for s in f.readlines()])
+    chunk_blacklist = set()
+    if args.chunk_blacklist:
+        with open(args.chunk_blacklist) as f:
+            for line in f:
+                parts = line.strip().split(',')
+                acc, chunk, chunk_size = parts[0], int(parts[1]), int(parts[2])
+                chunk_blacklist.add((acc, chunk, chunk_size))
+    logging.info(f"Read {len(whitelist)} whitelist, {len(blacklist)} blacklist accessions, and {len(chunk_blacklist)} chunk blacklist entries")
 
     num_submitted = 0
     qu = queue.Queue()
     for e in runs.rows(named=True):
         if args.whitelist is None or e['acc'] in whitelist:
             if args.blacklist is None or e['acc'] not in blacklist:
-                qu.put(e)
+                if (e['acc'], e['chunk'], e['chunk_size']) not in chunk_blacklist:
+                    qu.put(e)
     total_to_submit = qu.qsize()
     logging.info(f"Found {total_to_submit} accessions to submit after white and blacklist filtering")
+
+    if args.dry_run:
+        sys.exit(0)
 
     if args.batch_size:
         batch_size = args.batch_size
@@ -109,7 +124,8 @@ if __name__ == '__main__':
                 min_running_pending = int(f.read().strip())
                 while True:
                     try:
-                        pods_output = extern.run("kubectl get pods -n argo --no-headers")
+                        # Get workflows not pods because otherwise we don't get the full list
+                        pods_output = extern.run("kubectl get workflows -n argo --no-headers")
                         running_pending = sum(1 for line in pods_output.splitlines()
                                               if len(line.split()) >= 3 and line.split()[2] in ('Running', 'Pending'))
                         logging.debug(f"Running/Pending: {running_pending}")

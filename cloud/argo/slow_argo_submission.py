@@ -109,7 +109,8 @@ if __name__ == '__main__':
                 min_running_pending = int(f.read().strip())
                 while True:
                     try:
-                        pods_output = extern.run("kubectl get pods -n argo --no-headers")
+                        # Get workflows not pods because otherwise we don't get the full list
+                        pods_output = extern.run("kubectl get workflows -n argo --no-headers")
                         running_pending = sum(1 for line in pods_output.splitlines()
                                               if len(line.split()) >= 3 and line.split()[2] in ('Running', 'Pending'))
                         logging.debug(f"Running/Pending: {running_pending}")
