@@ -129,7 +129,6 @@ if __name__ == '__main__':
                         running_pending = sum(1 for line in pods_output.splitlines()
                                               if len(line.split()) >= 3 and line.split()[1] in ('Running', 'Pending'))
                         logging.info(f"Running/Pending: {running_pending}")
-                        sys.exit(0)
                         break
                     except extern.ExternCalledProcessError as e:
                         logging.warning(f"Failed to get kubectl pod list. Retrying after pause. Error was {e}")
