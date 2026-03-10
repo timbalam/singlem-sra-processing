@@ -1,0 +1,24 @@
+#!/bin/bash
+# Show pod state counts for the argo namespace with % running
+
+kubectl get pods -n argo --no-headers 2>/dev/null | awk '
+{
+    status = $3
+    counts[status]++
+    total++
+}
+END {
+    if (total == 0) {
+        print "No pods found in argo namespace"
+        exit
+    }
+    printf "%-20s %6s\n", "STATUS", "COUNT"
+    printf "%-20s %6s\n", "------", "-----"
+    for (s in counts) {
+        printf "%-20s %6d\n", s, counts[s]
+    }
+    printf "%-20s %6d\n", "TOTAL", total
+    running = counts["Running"] + 0
+    printf "\n%.1f%% running (%d/%d)\n", (running/total)*100, running, total
+}
+'

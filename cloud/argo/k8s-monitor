@@ -1,0 +1,176 @@
+#!/bin/bash
+# k8s-monitor: Monitor running pods in argo namespace.
+# Sends an email if running pod count is below THRESHOLD for 2 consecutive minutes.
+# Also sends an email warning if any node disk usage exceeds 85%.
+# Usage: k8s-monitor <threshold>
+
+RECIPIENT="b.woodcroft@qut.edu.au"
+DISK_THRESHOLD=85
+disk_email_sent=0
+
+if [[ -z "$1" ]]; then
+    echo "Usage: $0 <threshold> [--no-email]"
+    exit 1
+fi
+
+THRESHOLD="$1"
+below_count=0
+email_sent=0
+no_email=0
+for arg in "${@:2}"; do
+    [[ "$arg" == "--no-email" ]] && no_email=1
+done
+
+send_email() {
+    local running="$1"
+    local subject="k8s-monitor alert: only $running running pods (threshold: $THRESHOLD)"
+    local body="Alert: running pod count has been below $THRESHOLD for 2 consecutive minutes.
+
+Current running pods: $running
+Threshold: $THRESHOLD
+Host: $(hostname)
+Time: $(date)
+
+-- k8s-monitor
+"
+    if [[ "$no_email" -eq 0 ]]; then
+        printf "To: %s\nSubject: %s\n\n%s" "$RECIPIENT" "$subject" "$body" | ssh aqua sendmail "$RECIPIENT"
+        echo "Alert email sent to $RECIPIENT"
+    else
+        echo "  (--no-email: skipping alert email)"
+    fi
+}
+
+check_disk_usage() {
+    local tmpdir
+    tmpdir=$(mktemp -d)
+
+    query_node() {
+        local NODE="$1"
+        local STATS
+        STATS=$(kubectl get --raw "/api/v1/nodes/${NODE}/proxy/stats/summary" 2>/dev/null)
+        [ -z "$STATS" ] && return
+        local RESULT
+        RESULT=$(echo "$STATS" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+fs = d.get('node', {}).get('fs', {})
+used = fs.get('usedBytes', 0)
+cap = fs.get('capacityBytes', 1)
+pct = round(used / cap * 100, 1)
+def human(b):
+    for unit in ['B','Ki','Mi','Gi','Ti']:
+        if b < 1024 or unit == 'Ti':
+            return f'{b:.1f}{unit}'
+        b /= 1024
+print(used, cap, human(used), human(cap), pct)
+" 2>/dev/null)
+        [ -z "$RESULT" ] && return
+        echo "$NODE $RESULT" > "$tmpdir/$NODE"
+    }
+
+    local NODES
+    mapfile -t NODES < <(kubectl get nodes --no-headers -o custom-columns=NAME:.metadata.name 2>/dev/null)
+
+    for NODE in "${NODES[@]}"; do
+        query_node "$NODE" &
+    done
+    wait
+
+    local over_threshold=()
+    local total_used=0 total_cap=0 max_pct=0 max_node="" max_used_h="" max_cap_h=""
+    for NODE in "${NODES[@]}"; do
+        [ -f "$tmpdir/$NODE" ] || continue
+        read -r _NODE USED_B CAP_B USED_H CAP_H PCT < "$tmpdir/$NODE"
+        total_used=$((total_used + USED_B))
+        total_cap=$((total_cap + CAP_B))
+        PCT_INT=${PCT%.*}
+        if [[ "$PCT_INT" -ge "$max_pct" ]]; then
+            max_pct=$PCT_INT; max_node=$NODE; max_used_h=$USED_H; max_cap_h=$CAP_H
+        fi
+        if [[ "$PCT_INT" -ge "$DISK_THRESHOLD" ]]; then
+            over_threshold+=("$NODE: ${USED_H}/${CAP_H} (${PCT}%)")
+        fi
+    done
+    rm -rf "$tmpdir"
+
+    if [[ "$total_cap" -gt 0 ]]; then
+        local avg_pct
+        avg_pct=$(python3 -c "print(round($total_used / $total_cap * 100, 1))")
+        local avg_used_h avg_cap_h
+        avg_used_h=$(python3 -c "
+b=$total_used/${#NODES[@]}
+for u in ['B','Ki','Mi','Gi','Ti']:
+    if b<1024 or u=='Ti': print(f'{b:.1f}{u}'); break
+    b/=1024
+")
+        echo "  disk avg: ${avg_used_h} used (${avg_pct}%)  max: ${max_node} ${max_used_h}/${max_cap_h} (${max_pct}%)"
+    fi
+
+    if [[ "${#over_threshold[@]}" -gt 0 && "$disk_email_sent" -eq 0 ]]; then
+        local node_list
+        node_list=$(printf '%s\n' "${over_threshold[@]}")
+        local subject="k8s-monitor alert: ${#over_threshold[@]} node(s) disk usage above ${DISK_THRESHOLD}%"
+        local body="Warning: the following nodes have disk usage above ${DISK_THRESHOLD}%:
+
+${node_list}
+
+Host: $(hostname)
+Time: $(date)
+
+-- k8s-monitor
+"
+        if [[ "$no_email" -eq 0 ]]; then
+            printf "To: %s\nSubject: %s\n\n%s" "$RECIPIENT" "$subject" "$body" | ssh aqua sendmail "$RECIPIENT"
+            echo "Disk usage alert email sent to $RECIPIENT"
+        else
+            echo "  (--no-email: skipping disk usage alert email)"
+        fi
+        disk_email_sent=1
+    elif [[ "${#over_threshold[@]}" -eq 0 ]]; then
+        disk_email_sent=0
+    fi
+}
+
+echo "Monitoring argo namespace (threshold: $THRESHOLD running pods). Press Ctrl-C to stop."
+
+while true; do
+    running=$(kubectl get pods -n argo --no-headers 2>/dev/null | awk '$3=="Running"{count++} END{print count+0}')
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+
+    echo "$timestamp  Running: $running (threshold: $THRESHOLD)"
+
+    check_disk_usage
+
+    if [[ "$running" -lt "$THRESHOLD" ]]; then
+        below_count=$((below_count + 1))
+        echo "  Below threshold for $below_count consecutive minute(s)"
+        if [[ "$below_count" -ge 4 ]]; then
+            final_subject="k8s-monitor FINAL WARNING: still only $running running pods after 4 minutes (threshold: $THRESHOLD)"
+            final_body="Final warning: running pod count has been below $THRESHOLD for 4 consecutive minutes. Monitoring is stopping.
+
+Current running pods: $running
+Threshold: $THRESHOLD
+Host: $(hostname)
+Time: $(date)
+
+-- k8s-monitor
+"
+            if [[ "$no_email" -eq 0 ]]; then
+                printf "To: %s\nSubject: %s\n\n%s" "$RECIPIENT" "$final_subject" "$final_body" | ssh aqua sendmail "$RECIPIENT"
+                echo "Final warning email sent. Exiting."
+            else
+                echo "  (--no-email: skipping final warning email). Exiting."
+            fi
+            exit 1
+        elif [[ "$below_count" -ge 2 && "$email_sent" -eq 0 ]]; then
+            send_email "$running"
+            email_sent=1
+        fi
+    else
+        below_count=0
+        email_sent=0
+    fi
+
+    sleep 60
+done
