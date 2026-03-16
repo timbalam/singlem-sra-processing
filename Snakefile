@@ -179,8 +179,11 @@ rule per_acc_summary:
         mem_mb = 8000,
         runtime = '24h',
     shell:
+        ## NOTE: As of writing (sandpiper 1.1.10), this has not been tested within snakemake - it was run separately to avoid snakemake rerunning stuff.
         # "PYTHONPATH={singlem_base_directory} "
         "pixi run -e singlem ./per_acc_summary.py -p <(zcat {input.condensed_profile}) "
         "--microbial-fractions {input.fractions} "
         "-o {output.summary} "
-        "--host-predictions {input.preds} 2> {log}"
+        "--host-predictions {input.preds} "
+        "--acc-organism-csv {acc_organism} " # Must read from here otherwise ones like "synthetic metagenome" will be missing from the acc-organism mapping, and thus not get the right organism in the summary.
+        "2> {log}"

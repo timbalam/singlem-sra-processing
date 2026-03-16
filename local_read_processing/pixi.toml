@@ -1,0 +1,16 @@
+[workspace]
+authors = ["Ben Woodcroft <benjwoodcroft@gmail.com>"]
+channels = ["conda-forge", "bioconda"]
+name = "213_deepocean_lyrebird"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+# [tasks]
+# find-samples = "snakemake --snakefile workflow/find_samples.smk --cores 1"
+# run = "snakemake --cores all"
+
+[dependencies]
+# singlem = "*" # checked out version used, not bioconda
+snakemake = ">=8"
+pandas = "*"
+snakemake-executor-plugin-cluster-generic = "*"

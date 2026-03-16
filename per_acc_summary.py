@@ -53,7 +53,7 @@ if __name__ == '__main__':
     parent_parser.add_argument('-o', '--output', help='The output summary file', required=True)
     parent_parser.add_argument('--microbial-fractions', help='The input microbial fractions file', required=True)
     parent_parser.add_argument('--host-predictions', help='The input host predictions file', required=True)
-    # parent_parser.add_argument('--input-metagenome-sizes', help='The input metagenome sizes file', required=True)
+    parent_parser.add_argument('--acc-organism-csv', help='The input acc-organism mapping file', required=True)
 
     args = parent_parser.parse_args()
 
@@ -75,6 +75,8 @@ if __name__ == '__main__':
     logging.info('Reading host predictions')
     hp = pl.read_csv(args.host_predictions, separator='\t')
     logging.info(f'Read {len(hp)} host predictions')
+    # Remove organism column from host predictions, as it is not needed in the summary and will be added later from the acc-organism mapping
+    hp = hp.select(pl.exclude('organism'))
 
     # Read metagenome sizes
     # logging.info('Reading metagenome sizes')
@@ -82,6 +84,27 @@ if __name__ == '__main__':
     # logging.info(f'Read {len(ms)} metagenome sizes')
 
     merged1 = mf.join(hp, left_on='sample', right_on='acc', how='outer')
+    # Remove the acc column from the host predictions, as it is redundant
+    merged1 = merged1.select(pl.exclude('acc'))
+
+    # Read acc-organism mapping
+    acc_organism_csv = pl.read_csv(args.acc_organism_csv, has_header=True)
+    # remove bioproject column
+    acc_organism_csv = acc_organism_csv.select(pl.exclude('bioproject'))
+    merged2 = merged1.join(acc_organism_csv, left_on='sample', right_on='acc', how='left')
+
+    logging.info(f'In merged2, columns are: {merged2.columns}')
+
+
+    # When host_or_not is missing, set to prediction
+    # Log how many rows have missing host_or_not before filling
+    missing_host_or_not = merged2.filter(pl.col('host_or_not').is_null())
+    logging.info(f'{len(missing_host_or_not)} rows have missing host_or_not before filling')
+    merged2 = merged2.with_columns(pl.when(pl.col('host_or_not').is_null()).then(pl.col('prediction')).otherwise(pl.col('host_or_not')).alias('host_or_not'))
+    logging.info(f'{len(merged2.filter(pl.col("host_or_not").is_null()))} rows have missing host_or_not after filling')
+
+    # Rename read_fraction as singlem prokaryotic fraction
+    merged2 = merged2.rename({'read_fraction': 'singlem_prokaryotic_fraction'})
 
     logging.info("Reading coverages and calculating - takes some time.")
     profile_ids = []
@@ -111,9 +134,14 @@ if __name__ == '__main__':
         'root_coverage': profile_root_coverage,
         'species_coverage': profile_species_coverage
     })
-    coverages = coverages.with_columns((pl.col('species_coverage') / pl.col('root_coverage')).alias('known_species_fraction'))
+    # round(2)
+    coverages = coverages.with_columns(pl.col('root_coverage').round(2))
+    coverages = coverages.with_columns(pl.col('species_coverage').round(2))
+
+    # known_species fraction should be a % like read_fraction, so multiply by 100, round to 2 decimal places
+    coverages = coverages.with_columns(((pl.col('species_coverage') / pl.col('root_coverage')).alias('known_species_fraction')* 100).round(2))
     
-    merged = coverages.join(merged1, on='sample', how='outer')
+    merged = coverages.join(merged2, on='sample', how='left')
 
     logging.info("Writing output ..")
     merged.write_csv(args.output)
@@ -123,6 +151,7 @@ if __name__ == '__main__':
     logging.info(f'Coverages: {len(coverages)} rows')
     logging.info(f'Microbial fractions: {len(mf)} rows')
     logging.info(f'Host predictions: {len(hp)} rows')
+    logging.info(f'Acc-organism mapping: {len(acc_organism_csv)} rows')
 
     logging.info("Done.")
 

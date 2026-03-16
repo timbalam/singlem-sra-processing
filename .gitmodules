@@ -4,3 +4,6 @@
 [submodule "bowerbird"]
 	path = bowerbird
 	url = https://github.com/thepatientwait/bowerbird.git
+[submodule "local_read_processing/singlem"]
+	path = local_read_processing/singlem
+	url = https://github.com/wwood/singlem

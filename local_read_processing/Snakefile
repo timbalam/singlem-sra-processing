@@ -1,0 +1,143 @@
+"""
+Main workflow: run lyrebird pipe over every sample in config/samples.csv.
+
+Prerequisites
+-------------
+1.  Run the file-discovery workflow once to populate config/samples.csv:
+        snakemake --snakefile workflow/find_samples.smk --cores 1
+
+2.  Ensure the lyrebird metapackage has been downloaded:
+        lyrebird data --output-directory /path/to/lyrebird_metapackage
+    If you have a metapackage, set LYREBIRD_METAPACKAGE below (or leave
+    empty to let lyrebird use its default search path).
+
+Outputs (per accession ACC, prefix = ACC[:6])
+----------------------------------------------
+  results/archives/<prefix>/<ACC>.json.gz   --archive-otu-table, gzipped
+  results/profiles/<prefix>/<ACC>.json.gz   -p (taxonomic profile), gzipped
+  results/done/<prefix>/<ACC>.done          touch sentinel
+"""
+
+import os
+import sys
+import pandas as pd
+from pathlib import Path
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+
+# configfile: "config/config.yaml"
+
+LYREBIRD_METAPACKAGE = config["lyrebird_metapackage"]
+SAMPLES_CSV          = config["samples_csv"]
+RESULTS_DIR          = config["results_dir"]
+
+# ---------------------------------------------------------------------------
+# Load samples
+# ---------------------------------------------------------------------------
+
+if not os.path.exists(SAMPLES_CSV):
+    sys.exit(
+        f"ERROR: {SAMPLES_CSV} not found.\n"
+        "Run the file-discovery workflow first:\n"
+        "  snakemake --snakefile workflow/find_samples.smk --cores 1"
+    )
+
+samples_df = pd.read_csv(SAMPLES_CSV, dtype=str, keep_default_na=False)
+
+SAMPLES = {}
+for _, row in samples_df.iterrows():
+    acc = row["acc"].strip()
+    r1  = row["r1"].strip()
+    r2  = row["r2"].strip() if row["r2"].strip() else None
+    if not r1:
+        continue
+    SAMPLES[acc] = {"r1": r1, "r2": r2}
+
+ALL_ACCS     = sorted(SAMPLES.keys())
+ALL_ACCS = ALL_ACCS[:2] # debug
+ALL_PREFIXES = [acc[:6] for acc in ALL_ACCS]
+
+# ---------------------------------------------------------------------------
+# Helper functions
+# ---------------------------------------------------------------------------
+
+def lyrebird_input(wildcards):
+    s = SAMPLES[wildcards.acc]
+    files = [s["r1"]]
+    if s["r2"]:
+        files.append(s["r2"])
+    return files
+
+
+def lyrebird_reads_params(wildcards):
+    s = SAMPLES[wildcards.acc]
+    if s["r2"]:
+        return f"--forward {s['r1']} --reverse {s['r2']}"
+    return f"--forward {s['r1']}"
+
+
+def metapackage_param(_wildcards):
+    if LYREBIRD_METAPACKAGE:
+        return f"--metapackage {LYREBIRD_METAPACKAGE}"
+    return ""
+
+
+# ---------------------------------------------------------------------------
+# Rules
+# ---------------------------------------------------------------------------
+
+rule all:
+    input:
+        expand(
+            f"{RESULTS_DIR}/archives/{{prefix}}/{{acc}}.json.gz",
+            zip,
+            prefix=ALL_PREFIXES,
+            acc=ALL_ACCS,
+        ),
+        expand(
+            f"{RESULTS_DIR}/profiles/{{prefix}}/{{acc}}.json.gz",
+            zip,
+            prefix=ALL_PREFIXES,
+            acc=ALL_ACCS,
+        ),
+
+
+rule lyrebird_pipe:
+    """Run lyrebird pipe on one sample, then gzip the archive OTU table."""
+    input:
+        lyrebird_input,
+    output:
+        archive = f"{RESULTS_DIR}/archives/{{prefix}}/{{acc}}.json.gz",
+        profile = f"{RESULTS_DIR}/profiles/{{prefix}}/{{acc}}.json.gz",
+        done    = touch(f"{RESULTS_DIR}/done/{{prefix}}/{{acc}}.done"),
+    params:
+        reads      = lyrebird_reads_params,
+        metapackage = metapackage_param,
+    retries: 1
+    threads: lambda wildcards, attempt: 8 if attempt == 1 else 16
+    resources:
+        mem_mb      = 32 * 1024,   # 32 GB
+        runtime     = lambda wildcards, attempt: '24h' if attempt == 1 else '48h'
+    benchmark:
+        f"{RESULTS_DIR}/benchmarks/{{prefix}}/{{acc}}.csv",
+    log:
+        f"{RESULTS_DIR}/logs/{{prefix}}/{{acc}}.log",
+    shell:
+        r"""
+        set -euo pipefail
+        exec >{log} 2>&1
+        tmpdir=$(mktemp -d)
+        trap "rm -rf '$tmpdir'" EXIT
+
+        pixi run --manifest-path singlem/pixi.toml lyrebird pipe \
+            {params.reads} \
+            --archive-otu-table "$tmpdir/archive.json" \
+            -p "$tmpdir/profile.tsv" \
+            --threads {threads} \
+            {params.metapackage}
+
+        gzip -c "$tmpdir/archive.json" > {output.archive}
+        gzip -c "$tmpdir/profile.tsv"  > {output.profile}
+        """

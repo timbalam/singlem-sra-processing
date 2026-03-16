@@ -1,0 +1,3 @@
+lyrebird_metapackage: "/work/microbiome/db/singlem/lyrebird_v0.3.1_phrog_v4.1_metapackage_20250720.smpkg.zb"
+samples_csv: "config/samples.csv"
+results_dir: "results"

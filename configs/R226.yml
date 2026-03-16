@@ -1,4 +1,4 @@
-GTDB_VERSION: '10-RS220'
+GTDB_VERSION: '10-RS220' #WRONG !
 RENEWED_OUTPUT_BASE_DIRECTORY:  '/work/microbiome/msingle/mess/198_R226_renew_mach2/renew_combined'
 BASE_OUTPUT_DIRECTORY:  '/work/microbiome/msingle/mess/198_R226_renew_mach2/processing_20250409-mach2'
 PREDICTOR_PREFIX:  'sra_20250220.10-R226-'
