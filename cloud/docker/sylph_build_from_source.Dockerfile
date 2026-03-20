@@ -19,11 +19,9 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 RUN apt-get install -y cmake gcc make wget
 
 # Sylph
-RUN cd /tmp && wget https://github.com/bluenote-1577/sylph/archive/refs/tags/v0.9.0.tar.gz
-RUN cd /tmp && tar xzf v0.9.0.tar.gz
-RUN cd /tmp/sylph-0.9.0 && cargo install --path . --root ~/.cargo
-RUN sylph profile /tmp/sylph-0.9.0/test_files/*
-RUN rm -rf /tmp/sylph-0.9.0 /tmp/v0.9.0.tar.gz
+RUN git clone --depth 1 --branch add-merge-subcommand https://github.com/wwood/sylph /tmp/sylph
+RUN cd /tmp/sylph && cargo install --path . --root ~/.cargo
+RUN sylph profile /tmp/sylph/test_files/*
 
 # # Compile diamond from source for speed
 # RUN apt-get install -y cmake g++ make wget libpthread-stubs0-dev zlib1g-dev
@@ -117,8 +115,34 @@ RUN rm /tmp/sratoolkit.tar.gz
 # # RUN apt remove python3-tqdm -y
 # # RUN cd singlem && pip install -e . --break-system-packages
 RUN cd /tmp && kingfisher extract --sra /tmp/SRR8653040.sra -t 8 -f fasta
-RUN sylph sketch -1 /tmp/SRR8653040_1.fasta -2 /tmp/SRR8653040_2.fasta -t 50 -d /tmp
-RUN rm /tmp/SRR8653040.*
+RUN python3 - <<'PY2'
+from pathlib import Path
+
+def records(path):
+    header = None
+    seq = []
+    with open(path) as fh:
+        for line in fh:
+            line = line.rstrip('\n')
+            if line.startswith('>'):
+                if header is not None:
+                    yield header, ''.join(seq)
+                header = line
+                seq = []
+            else:
+                seq.append(line)
+        if header is not None:
+            yield header, ''.join(seq)
+
+r1 = records('/tmp/SRR8653040_1.fasta')
+r2 = records('/tmp/SRR8653040_2.fasta')
+out = Path('/tmp/SRR8653040_interleaved.fasta')
+with out.open('w') as fh:
+    for rec1, rec2 in zip(r1, r2):
+        fh.write(f"{rec1[0]}\n{rec1[1]}\n{rec2[0]}\n{rec2[1]}\n")
+PY2
+RUN sylph sketch --interleaved /tmp/SRR8653040_interleaved.fasta -t 50 -d /tmp
+RUN rm /tmp/SRR8653040*
 
 # Clean apt-get files to try to make it smaller
 RUN rm -rf /var/lib/apt/lists/*
